@@ -3,10 +3,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'home_screen.dart';
 import 'workout_screen.dart';
 import 'profile_screen.dart';
+import '../services/hive_service.dart'; //Added by sreekesh
 
 class MainScreen extends StatefulWidget {
   final String customerName;
-  
+
   const MainScreen({super.key, required this.customerName});
 
   @override
@@ -17,18 +18,26 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   late List<Widget> _screens;
   String? _customerName;
+  Box? _userBox;
 
   @override
   void initState() {
     super.initState();
-    _loadCustomerName();
+    // _loadCustomerName();
+    _initializeAndLoadCustomer();
   }
 
-  Future<void> _loadCustomerName() async {
-    // Replace SharedPreferences with Hive
-    final userBox = Hive.box('auth');
+  Future<void> _initializeAndLoadCustomer() async {
+    await HiveService.openBox('auth'); // Make sure it's opened
+    _userBox = Hive.box('auth'); // Cache it
+
+    final customerName = _userBox?.get(
+      'customer_name',
+      defaultValue: widget.customerName,
+    );
+
     setState(() {
-      _customerName = userBox.get('customer_name', defaultValue: widget.customerName);
+      _customerName = customerName;
       _screens = [
         HomeScreen(username: _customerName ?? 'Member'),
         WorkoutScreen(),
@@ -36,6 +45,19 @@ class _MainScreenState extends State<MainScreen> {
       ];
     });
   }
+
+  // Future<void> _loadCustomerName() async {
+  //   await HiveService.openBox('auth'); // Make sure it's opened
+  //   final userBox = Hive.box('auth');
+  //   setState(() {
+  //     _customerName = userBox.get('customer_name', defaultValue: widget.customerName);
+  //     _screens = [
+  //       HomeScreen(username: _customerName ?? 'Member'),
+  //       WorkoutScreen(),
+  //       ProfileScreen(customerName: _customerName ?? 'Member'),
+  //     ];
+  //   });
+  // }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -47,9 +69,10 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       //backgroundColor: Colors.black,
-      body: _screens.isNotEmpty 
-          ? _screens[_selectedIndex] 
-          : const Center(child: CircularProgressIndicator()),
+      body:
+          _screens.isNotEmpty
+              ? _screens[_selectedIndex]
+              : const Center(child: CircularProgressIndicator()),
       bottomNavigationBar: _buildModernNavBar(),
     );
   }
@@ -57,14 +80,14 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildModernNavBar() {
     return Container(
       decoration: BoxDecoration(
-       // borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-       color: Color(0xFF0B1739),
+        // borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: Color(0xFF0B1739),
         boxShadow: [
           BoxShadow(
             color: Colors.white.withOpacity(0.1),
             blurRadius: 10,
             spreadRadius: 2,
-          )
+          ),
         ],
       ),
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -121,7 +144,7 @@ class _NavBarItem extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-       
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

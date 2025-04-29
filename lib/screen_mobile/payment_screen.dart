@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'api_service.dart';
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../services/hive_service.dart'; //Added by sreekesh
 
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({super.key});
@@ -29,9 +30,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   Future<void> _initializeHiveAndData() async {
     try {
-      _paymentCacheBox = await Hive.openBox('payment_cache');
+      _paymentCacheBox = await HiveService.openBox('payment_cache');
       await _loadCachedPayments();
-      
+
       // Use different strategy based on first load or not
       if (_isFirstLoad) {
         await _fetchFullPayments();
@@ -67,7 +68,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       }
 
       final response = await _apiService.authenticatedGet(
-        'payment/check-payments-updates?since=${_lastUpdated!.toIso8601String()}'
+        'payment/check-payments-updates?since=${_lastUpdated!.toIso8601String()}',
       );
 
       if (response.statusCode == 200) {
@@ -98,7 +99,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         _isRefreshing = false;
         _errorOccurred = true;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to check for updates'),
@@ -108,48 +109,53 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     }
   }
 
-
   Future<void> _fetchFullPayments() async {
-  try {
-    final response = await _apiService.authenticatedGet('payment/payments');
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      await _updateCache(data, DateTime.now());
-      
-      // Show success feedback if this was a manual refresh
-      if (_isRefreshing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payments refreshed'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+    try {
+      final response = await _apiService.authenticatedGet('payment/payments');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await _updateCache(data, DateTime.now());
+
+        // Show success feedback if this was a manual refresh
+        if (_isRefreshing) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Payments refreshed'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to load payments: ${response.statusCode}');
       }
-    } else {
-      throw Exception('Failed to load payments: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching full payments: $e');
+      throw e; // Re-throw to be caught by _checkForUpdates
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _isRefreshing = false;
+      });
     }
-  } catch (e) {
-    print('Error fetching full payments: $e');
-    throw e; // Re-throw to be caught by _checkForUpdates
-  } finally {
-    setState(() {
-      _isLoading = false;
-      _isRefreshing = false;
-    });
   }
-}
 
   Future<void> _fetchDeltaPayments() async {
     try {
       final response = await _apiService.authenticatedGet(
-        'payment/payments-delta?since=${_lastUpdated!.toIso8601String()}'
+        'payment/payments-delta?since=${_lastUpdated!.toIso8601String()}',
       );
-      
+
       if (response.statusCode == 200) {
         final deltaData = jsonDecode(response.body);
-        final updatedPayments = _mergeDeltaData(_payments, deltaData['payments']);
-        await _updateCache(updatedPayments, DateTime.parse(deltaData['lastUpdated']));
+        final updatedPayments = _mergeDeltaData(
+          _payments,
+          deltaData['payments'],
+        );
+        await _updateCache(
+          updatedPayments,
+          DateTime.parse(deltaData['lastUpdated']),
+        );
       } else {
         // Fallback to full refresh if delta fails
         await _fetchFullPayments();
@@ -162,20 +168,25 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   List<dynamic> _mergeDeltaData(List<dynamic> existing, List<dynamic> delta) {
     final result = List<dynamic>.from(existing);
-    
+
     for (final payment in delta) {
-      final index = result.indexWhere((p) => p['payment_id'] == payment['payment_id']);
+      final index = result.indexWhere(
+        (p) => p['payment_id'] == payment['payment_id'],
+      );
       if (index >= 0) {
         result[index] = payment; // Update existing
       } else {
         result.add(payment); // Add new
       }
     }
-    
+
     // Sort by date descending
-    result.sort((a, b) => DateTime.parse(b['transaction_date'])
-        .compareTo(DateTime.parse(a['transaction_date'])));
-    
+    result.sort(
+      (a, b) => DateTime.parse(
+        b['transaction_date'],
+      ).compareTo(DateTime.parse(a['transaction_date'])),
+    );
+
     return result;
   }
 
@@ -184,7 +195,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       'data': data,
       'lastUpdated': lastUpdated.toIso8601String(),
     });
-    
+
     setState(() {
       _payments = data;
       _lastUpdated = lastUpdated;
@@ -262,13 +273,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Color(0xFF0B1739),
-              fontSize: 14,
-            ),
-          ),
+          Text(label, style: TextStyle(color: Color(0xFF0B1739), fontSize: 14)),
           const SizedBox(height: 4),
           Text(
             value,
@@ -287,7 +292,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   void _showPaymentDetailModal(Map<String, dynamic> payment) {
     final status = payment['status']?.toString().toLowerCase();
     final date = DateTime.parse(payment['transaction_date']);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -333,48 +338,32 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       shape: BoxShape.circle,
                       color: Color(0xFF0B1739),
                     ),
-                    child: Icon(
-                      Icons.receipt,
-                      size: 30,
-                      color: Colors.blue,
-                    ),
+                    child: Icon(Icons.receipt, size: 30, color: Colors.blue),
                   ),
                 ),
                 const SizedBox(height: 20),
                 _buildDetailRow(
-                  'Amount', 
-                  '₹${payment['amount']?.toStringAsFixed(2) ?? '0.00'}'
+                  'Amount',
+                  '₹${payment['amount']?.toStringAsFixed(2) ?? '0.00'}',
                 ),
+                _buildDetailRow('Payment ID', payment['payment_id'].toString()),
                 _buildDetailRow(
-                  'Payment ID', 
-                  payment['payment_id'].toString()
+                  'Date',
+                  DateFormat('MMM dd, yyyy').format(date),
                 ),
+                _buildDetailRow('Time', DateFormat('hh:mm a').format(date)),
                 _buildDetailRow(
-                  'Date', 
-                  DateFormat('MMM dd, yyyy').format(date)
+                  'Payment Method',
+                  payment['payment_method'] ?? 'N/A',
                 ),
-                _buildDetailRow(
-                  'Time', 
-                  DateFormat('hh:mm a').format(date)
-                ),
-                _buildDetailRow(
-                  'Payment Method', 
-                  payment['payment_method'] ?? 'N/A'
-                ),
-                _buildDetailRow(
-                  'Description', 
-                  payment['description'] ?? 'N/A'
-                ),
+                _buildDetailRow('Description', payment['description'] ?? 'N/A'),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Row(
                     children: [
                       const Text(
                         'Status: ',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                       _buildStatusBadge(payment['status']),
                     ],
@@ -398,9 +387,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       ),
                       child: const Text(
                         'PAY NOW',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -423,9 +410,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     ),
                     child: const Text(
                       'DOWNLOAD RECEIPT',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -474,25 +459,16 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.payment,
-            size: 60,
-            color: Colors.grey.withOpacity(0.5),
-          ),
+          Icon(Icons.payment, size: 60, color: Colors.grey.withOpacity(0.5)),
           const SizedBox(height: 16),
           const Text(
             'No payment history',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 18),
           ),
           const SizedBox(height: 8),
           Text(
             'Your payment history will appear here',
-            style: TextStyle(
-              color: Colors.grey[400],
-            ),
+            style: TextStyle(color: Colors.grey[400]),
           ),
         ],
       ),
@@ -516,7 +492,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 color: Colors.black.withOpacity(0.3),
                 blurRadius: 6,
                 spreadRadius: 2,
-              )
+              ),
             ],
           ),
           child: InkWell(
@@ -544,26 +520,16 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   const SizedBox(height: 12),
                   Text(
                     payment['description'] ?? 'No description',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 16),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(
-                        Icons.payment,
-                        color: Colors.grey[500],
-                        size: 18,
-                      ),
+                      Icon(Icons.payment, color: Colors.grey[500], size: 18),
                       const SizedBox(width: 8),
                       Text(
                         payment['payment_method'] ?? 'Unknown method',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.grey[400], fontSize: 14),
                       ),
                       const Spacer(),
                       Icon(
@@ -574,10 +540,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       const SizedBox(width: 8),
                       Text(
                         _formatDate(payment['transaction_date']),
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.grey[400], fontSize: 14),
                       ),
                     ],
                   ),
@@ -621,26 +584,25 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         onRefresh: () async {
           setState(() => _isRefreshing = true);
           try {
-          await _checkForUpdates();
-        } catch (e) {
-          // Error handling is already done in _checkForUpdates
-        }
-      },
+            await _checkForUpdates();
+          } catch (e) {
+            // Error handling is already done in _checkForUpdates
+          }
+        },
         color: Colors.blue,
         displacement: 40, // How far down the indicator appears
         strokeWidth: 2.5, // Thickness of the refresh indicator
         triggerMode: RefreshIndicatorTriggerMode.onEdge,
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.blue,
-                ),
-              )
-            : _errorOccurred
+        child:
+            _isLoading
+                ? const Center(
+                  child: CircularProgressIndicator(color: Colors.blue),
+                )
+                : _errorOccurred
                 ? _buildErrorState()
                 : _payments.isEmpty
-                    ? _buildEmptyState()
-                    : _buildPaymentList(),
+                ? _buildEmptyState()
+                : _buildPaymentList(),
       ),
     );
   }

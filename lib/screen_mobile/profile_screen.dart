@@ -6,10 +6,11 @@ import 'profile_service.dart';
 import 'myaccount_screen.dart';
 import 'dart:convert';
 import 'Cache_Manager.dart';
+import '../services/hive_service.dart'; //Added by sreekesh
 
 class ProfileScreen extends StatefulWidget {
   final String customerName;
-  
+
   const ProfileScreen({super.key, required this.customerName});
 
   @override
@@ -22,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   bool _isUpdating = false;
   late Box _authBox;
- // DateTime _lastApiCallTime = DateTime.now();
+  // DateTime _lastApiCallTime = DateTime.now();
 
   @override
   void initState() {
@@ -31,20 +32,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _initHiveAndFetchData() async {
-    _authBox = await Hive.openBox('authBox');
+    _authBox = await HiveService.openBox('authBox');
     await _fetchProfileData();
   }
 
   Future<void> _fetchProfileData({bool forceRefresh = false}) async {
     //if (DateTime.now().difference(_lastApiCallTime) < Duration(seconds: 1)) {
-   // return; // Skip if called recently
- // }
- //_lastApiCallTime = DateTime.now();
+    // return; // Skip if called recently
+    // }
+    //_lastApiCallTime = DateTime.now();
 
     if (mounted) setState(() => _isLoading = true);
-    
+
     try {
-      final profile = await ProfileService.getProfile(forceRefresh: forceRefresh);
+      final profile = await ProfileService.getProfile(
+        forceRefresh: forceRefresh,
+      );
       if (mounted) {
         setState(() {
           _profileData = profile;
@@ -89,7 +92,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -116,78 +121,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: oldPasswordController,
                     label: 'Current Password',
                     obscureText: _obscureOldPassword,
-                    toggleVisibility: () => setState(() => _obscureOldPassword = !_obscureOldPassword),
+                    toggleVisibility:
+                        () => setState(
+                          () => _obscureOldPassword = !_obscureOldPassword,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildPasswordField(
                     controller: newPasswordController,
                     label: 'New Password',
                     obscureText: _obscureNewPassword,
-                    toggleVisibility: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                    toggleVisibility:
+                        () => setState(
+                          () => _obscureNewPassword = !_obscureNewPassword,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   _buildPasswordField(
                     controller: confirmPasswordController,
                     label: 'Confirm New Password',
                     obscureText: _obscureConfirmPassword,
-                    toggleVisibility: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    toggleVisibility:
+                        () => setState(
+                          () =>
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                        ),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isUpdatingPassword
-                          ? null
-                          : () async {
-                              if (newPasswordController.text != confirmPasswordController.text) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Passwords do not match'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              setState(() => _isUpdatingPassword = true);
-                              try {
-                                final response = await _apiService.authenticatedPost(
-                                  'auth/reset-password',
-                                  body: {
-                                    'old_password': oldPasswordController.text,
-                                    'new_password': newPasswordController.text,
-                                  },
-                                );
-
-                                if (response.statusCode == 200) {
-                                  Navigator.pop(context);
+                      onPressed:
+                          _isUpdatingPassword
+                              ? null
+                              : () async {
+                                if (newPasswordController.text !=
+                                    confirmPasswordController.text) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Password updated successfully'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                } else {
-                                  final error = jsonDecode(response.body)['error'];
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(error ?? 'Failed to update password'),
+                                      content: Text('Passwords do not match'),
                                       backgroundColor: Colors.redAccent,
                                     ),
                                   );
+                                  return;
                                 }
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error: ${e.toString()}'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                              } finally {
-                                setState(() => _isUpdatingPassword = false);
-                              }
-                            },
+
+                                setState(() => _isUpdatingPassword = true);
+                                try {
+                                  final response = await _apiService
+                                      .authenticatedPost(
+                                        'auth/reset-password',
+                                        body: {
+                                          'old_password':
+                                              oldPasswordController.text,
+                                          'new_password':
+                                              newPasswordController.text,
+                                        },
+                                      );
+
+                                  if (response.statusCode == 200) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Password updated successfully',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } else {
+                                    final error =
+                                        jsonDecode(response.body)['error'];
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          error ?? 'Failed to update password',
+                                        ),
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                } finally {
+                                  setState(() => _isUpdatingPassword = false);
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color(0xFF0064F4),
                         foregroundColor: Colors.black,
@@ -195,21 +221,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: _isUpdatingPassword
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.black,
-                                strokeWidth: 2,
+                      child:
+                          _isUpdatingPassword
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.black,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text(
+                                'UPDATE PASSWORD',
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                            )
-                          : const Text(
-                              'UPDATE PASSWORD',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
                     ),
                   ),
                 ],
@@ -259,9 +284,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MyAccountScreen(
-            profileData: Map<String, dynamic>.from(_profileData!),
-          ),
+          builder:
+              (context) => MyAccountScreen(
+                profileData: Map<String, dynamic>.from(_profileData!),
+              ),
         ),
       );
 
@@ -285,33 +311,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout(BuildContext context) async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Logout',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Are you sure you want to logout?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white))),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text('Logout', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              'Are you sure you want to logout?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Logout',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (shouldLogout == true) {
       try {
         await _apiService.logout();
       } finally {
-        await CacheManager.clearAllCache(); 
+        await CacheManager.clearAllCache();
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
@@ -347,129 +378,145 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF57C3FF), // Lighter blue for loading
-              ),
-            )
-          : Stack(
-              children: [
-                SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 40),
-                      // Profile Header Section
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Color(0xFF0E1A3A), // Darker blue container
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 20,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Color(0xFF57C3FF), // Lighter blue border
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(0xFF57C3FF).withOpacity(0.2),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 50,
-                                backgroundColor: Color(0xFF0E1A3A),
-                                backgroundImage: _profileData?['profile_url'] != null
-                                    ? NetworkImage(_profileData!['profile_url'])
-                                    : const AssetImage('assets/images/profile.png') as ImageProvider,
-                                child: _profileData?['profile_url'] == null
-                                    ? Icon(Icons.person, size: 50, color: Colors.white54)
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              _profileData?['name'] ?? widget.customerName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _profileData?['email'] ?? '',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFFAEB9E1).withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      // Options Section
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          children: [
-                            _buildProfileOption(
-                              icon: Icons.person_outline,
-                              title: 'My Account',
-                              subtitle: 'Update your personal information',
-                              onTap: _handleProfileUpdate,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildProfileOption(
-                              icon: Icons.lock_outline,
-                              title: 'Change Password',
-                              subtitle: 'Set a new secure password',
-                              onTap: _showChangePasswordDialog,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildProfileOption(
-                              icon: Icons.logout,
-                              title: 'Logout',
-                              subtitle: 'Sign out of your account',
-                              isDestructive: true,
-                              onTap: () => _logout(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF57C3FF), // Lighter blue for loading
                 ),
-                if (_isUpdating)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black54,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF57C3FF), // Lighter blue for loading
+              )
+              : Stack(
+                children: [
+                  SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 40),
+                        // Profile Header Section
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF0E1A3A), // Darker blue container
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Color(
+                                      0xFF57C3FF,
+                                    ), // Lighter blue border
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFF57C3FF).withOpacity(0.2),
+                                      blurRadius: 20,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Color(0xFF0E1A3A),
+                                  backgroundImage:
+                                      _profileData?['profile_url'] != null
+                                          ? NetworkImage(
+                                            _profileData!['profile_url'],
+                                          )
+                                          : const AssetImage(
+                                                'assets/images/profile.png',
+                                              )
+                                              as ImageProvider,
+                                  child:
+                                      _profileData?['profile_url'] == null
+                                          ? Icon(
+                                            Icons.person,
+                                            size: 50,
+                                            color: Colors.white54,
+                                          )
+                                          : null,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                _profileData?['name'] ?? widget.customerName,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _profileData?['email'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFFAEB9E1).withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        // Options Section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            children: [
+                              _buildProfileOption(
+                                icon: Icons.person_outline,
+                                title: 'My Account',
+                                subtitle: 'Update your personal information',
+                                onTap: _handleProfileUpdate,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildProfileOption(
+                                icon: Icons.lock_outline,
+                                title: 'Change Password',
+                                subtitle: 'Set a new secure password',
+                                onTap: _showChangePasswordDialog,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildProfileOption(
+                                icon: Icons.logout,
+                                title: 'Logout',
+                                subtitle: 'Sign out of your account',
+                                isDestructive: true,
+                                onTap: () => _logout(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                  if (_isUpdating)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black54,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(
+                              0xFF57C3FF,
+                            ), // Lighter blue for loading
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
     );
   }
 
@@ -481,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool isDestructive = false,
   }) {
     final accentColor = isDestructive ? Color(0xFFFF6B6B) : Color(0xFF57C3FF);
-    
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -508,11 +555,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 1,
                 ),
               ),
-              child: Icon(
-                icon,
-                color: accentColor,
-                size: 24,
-              ),
+              child: Icon(icon, color: accentColor, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -531,10 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.white54, fontSize: 13),
                     ),
                   ],
                 ],
