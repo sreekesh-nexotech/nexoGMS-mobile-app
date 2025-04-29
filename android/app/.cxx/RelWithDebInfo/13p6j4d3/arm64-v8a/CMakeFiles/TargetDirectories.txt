@@ -1,0 +1,2 @@
+C:/Users/LENOVO/nexoGMS-main (2)/nexoGMS-main/frontend/gym_app_frontend/android/app/.cxx/RelWithDebInfo/13p6j4d3/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/LENOVO/nexoGMS-main (2)/nexoGMS-main/frontend/gym_app_frontend/android/app/.cxx/RelWithDebInfo/13p6j4d3/arm64-v8a/CMakeFiles/rebuild_cache.dir
