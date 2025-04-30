@@ -49,6 +49,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final hasCache =
         box.get(_workoutsKey) != null && box.get(_lastSyncKey) != null;
 
+    if (!mounted) return; // 🛡️ ensure widget is still active
     setState(() => isLoading = true);
 
     if (!hasCache) {
